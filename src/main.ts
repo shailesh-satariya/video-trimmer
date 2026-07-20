@@ -510,16 +510,14 @@ const endRange = queryElement<HTMLInputElement>('#trim-end-range');
 const startInput = queryElement<HTMLInputElement>('#trim-start-input');
 const endInput = queryElement<HTMLInputElement>('#trim-end-input');
 const selectionDuration = queryElement<HTMLElement>('#selection-duration');
-const playSelectionButton =
-  queryElement<HTMLButtonElement>('#play-selection');
+const playSelectionButton = queryElement<HTMLButtonElement>('#play-selection');
 const playSelectionLabel = queryElement<HTMLElement>('#play-selection span');
 const trimVideoButton = queryElement<HTMLButtonElement>('#trim-video');
 const exportProgress = queryElement<HTMLElement>('#export-progress');
 const exportStatus = queryElement<HTMLElement>('#export-status');
 const progressTrack = queryElement<HTMLElement>('.progress-track');
 const progressFill = queryElement<HTMLElement>('#progress-fill');
-const cancelExportButton =
-  queryElement<HTMLButtonElement>('#cancel-export');
+const cancelExportButton = queryElement<HTMLButtonElement>('#cancel-export');
 const exportMessage = queryElement<HTMLParagraphElement>('#export-message');
 const resultPanel = queryElement<HTMLElement>('#result-panel');
 const resultPreview = queryElement<HTMLVideoElement>('#result-preview');
@@ -528,16 +526,14 @@ const resultDuration = queryElement<HTMLElement>('#result-duration');
 const resultSize = queryElement<HTMLElement>('#result-size');
 const downloadResult = queryElement<HTMLButtonElement>('#download-result');
 const alignmentNotice = queryElement<HTMLParagraphElement>('#alignment-notice');
-const discardResultButton =
-  queryElement<HTMLButtonElement>('#discard-result');
-const filenameDialog =
-  queryElement<HTMLDialogElement>('#filename-dialog');
+const discardResultButton = queryElement<HTMLButtonElement>('#discard-result');
+const filenameDialog = queryElement<HTMLDialogElement>('#filename-dialog');
 const filenameForm = queryElement<HTMLFormElement>('#filename-form');
-const downloadFilename =
-  queryElement<HTMLInputElement>('#download-filename');
+const downloadFilename = queryElement<HTMLInputElement>('#download-filename');
 const filenameError = queryElement<HTMLParagraphElement>('#filename-error');
-const closeFilenameDialog =
-  queryElement<HTMLButtonElement>('#close-filename-dialog');
+const closeFilenameDialog = queryElement<HTMLButtonElement>(
+  '#close-filename-dialog',
+);
 const cancelFilenameButton =
   queryElement<HTMLButtonElement>('#cancel-filename');
 
@@ -690,12 +686,7 @@ function setTrimValue(
 ): void {
   releaseResult();
   exportMessage.hidden = true;
-  trimRange = updateTrimRange(
-    trimRange,
-    handle,
-    value,
-    video.duration,
-  );
+  trimRange = updateTrimRange(trimRange, handle, value, video.duration);
   renderTrimRange();
   stopSelectionPlayback();
 
@@ -897,10 +888,7 @@ function handleRangeInput(handle: TrimHandle, input: HTMLInputElement): void {
   setTrimValue(handle, Number.parseFloat(input.value));
 }
 
-function handleRangeKeydown(
-  event: KeyboardEvent,
-  handle: TrimHandle,
-): void {
+function handleRangeKeydown(event: KeyboardEvent, handle: TrimHandle): void {
   const directions: Partial<Record<string, number>> = {
     ArrowDown: -1,
     ArrowLeft: -1,
@@ -915,8 +903,7 @@ function handleRangeKeydown(
 
   event.preventDefault();
   const step = event.altKey ? 0.01 : event.shiftKey ? 1 : 0.1;
-  const currentValue =
-    handle === 'start' ? trimRange.start : trimRange.end;
+  const currentValue = handle === 'start' ? trimRange.start : trimRange.end;
   setTrimValue(handle, currentValue + direction * step);
 }
 
@@ -951,10 +938,7 @@ function bindHandleTooltip(
 bindHandleTooltip(startRange, startTooltip);
 bindHandleTooltip(endRange, endTooltip);
 
-function handleTimeInput(
-  handle: TrimHandle,
-  input: HTMLInputElement,
-): void {
+function handleTimeInput(handle: TrimHandle, input: HTMLInputElement): void {
   const value = Number.parseFloat(input.value);
   if (Number.isFinite(value)) {
     setTrimValue(handle, value);
@@ -1068,10 +1052,7 @@ trimVideoButton.addEventListener('click', async () => {
     resultSize.textContent = formatBytes(result.blob.size);
     resultDownloadFilename = result.filename;
 
-    const notice = getAlignmentNotice(
-      requestedStart,
-      result.actualStartSec,
-    );
+    const notice = getAlignmentNotice(requestedStart, result.actualStartSec);
     alignmentNotice.hidden = !notice;
     alignmentNotice.textContent = notice ?? '';
     resultPanel.hidden = false;
@@ -1088,7 +1069,8 @@ trimVideoButton.addEventListener('click', async () => {
 
     if (error instanceof DOMException && error.name === 'AbortError') {
       exportMessage.className = 'import-message import-message--notice';
-      exportMessage.textContent = 'Trimming cancelled. Your original video is unchanged.';
+      exportMessage.textContent =
+        'Trimming cancelled. Your original video is unchanged.';
     } else {
       exportMessage.className = 'import-message import-message--error';
       exportMessage.textContent =

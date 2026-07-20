@@ -19,10 +19,7 @@ type WorkerScope = {
     type: 'message',
     listener: (event: MessageEvent<TrimWorkerRequest>) => void,
   ) => void;
-  postMessage: (
-    message: TrimWorkerResponse,
-    transfer?: Transferable[],
-  ) => void;
+  postMessage: (message: TrimWorkerResponse, transfer?: Transferable[]) => void;
 };
 
 type TrackPlan = {
@@ -120,10 +117,7 @@ function createTrackPlans(
   }
 
   const requestedStartTick = Math.floor(startSec * videoTrack.timescale);
-  const videoStartIndex = findKeyframeIndex(
-    videoSamples,
-    requestedStartTick,
-  );
+  const videoStartIndex = findKeyframeIndex(videoSamples, requestedStartTick);
   const firstVideoSample = videoSamples[videoStartIndex];
   if (!firstVideoSample) {
     throw new Error('A valid video keyframe could not be found.');
@@ -167,8 +161,7 @@ function getDescriptionBoxes(
 ): IsoFileOptions['description_boxes'] {
   const sourceTrack = sourceFile.getTrackById(trackId);
   const sampleEntry = sourceTrack?.mdia?.minf?.stbl?.stsd?.entries?.[0] as
-    | { boxes?: IsoFileOptions['description_boxes'] }
-    | undefined;
+    { boxes?: IsoFileOptions['description_boxes'] } | undefined;
   return sampleEntry?.boxes ? [...sampleEntry.boxes] : [];
 }
 
@@ -252,7 +245,9 @@ async function remuxMp4(
       buildTrackOptions(sourceFile, plan, timelineOrigin),
     );
     if (outputId == null) {
-      throw new Error(`The ${plan.track.type ?? 'media'} track could not be copied.`);
+      throw new Error(
+        `The ${plan.track.type ?? 'media'} track could not be copied.`,
+      );
     }
 
     if (plan.track.type === 'video') {
@@ -274,8 +269,7 @@ async function remuxMp4(
   }
 
   const totalSamples = outputTracks.reduce(
-    (total, outputTrack) =>
-      total + outputTrack.plan.selectedSamples.length,
+    (total, outputTrack) => total + outputTrack.plan.selectedSamples.length,
     0,
   );
   let samplesCopied = 0;
@@ -316,10 +310,7 @@ async function remuxMp4(
       samplesCopied += 1;
 
       if (samplesCopied % 250 === 0) {
-        postProgress(
-          'copying',
-          0.2 + (samplesCopied / totalSamples) * 0.7,
-        );
+        postProgress('copying', 0.2 + (samplesCopied / totalSamples) * 0.7);
         await yieldToWorker();
       }
     }
@@ -397,4 +388,3 @@ workerScope.addEventListener('message', (event) => {
     });
   });
 });
-

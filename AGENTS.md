@@ -76,6 +76,14 @@ the user's device and all processing runs in the browser.
 - Test rotated video, variable frame rate, silent video, audio/video offsets,
   odd dimensions, short clips, and large inputs.
 
+## Quality Gate
+
+- Run `npm run quality` before committing application changes.
+- Use `npm run lint` for ESLint and `npm run format:check` for Prettier.
+- Use `npm run test:a11y` for automated axe checks in Chromium.
+- Keep keyboard and screen-reader checks in the manual test plan because
+  automated accessibility scans cannot detect every issue.
+
 ## Change Discipline
 
 - Keep the app focused on trimming; avoid unrelated editing features.

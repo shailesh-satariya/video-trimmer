@@ -24,4 +24,3 @@ describe('getThumbnailTimes', () => {
     expect(getThumbnailTimes(10, 0)).toEqual([]);
   });
 });
-

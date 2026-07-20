@@ -59,4 +59,3 @@ export function getVideoSizeNotice(size: number): string | undefined {
 
   return 'Large video: trimming may require significant memory on this device.';
 }
-

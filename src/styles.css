@@ -2,7 +2,11 @@
   color: #25231f;
   background: #f8f7f3;
   font-family:
-    Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Inter,
+    ui-sans-serif,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
     sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -62,7 +66,7 @@ a {
   display: inline-flex;
   align-items: center;
   gap: 11px;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: Georgia, 'Times New Roman', serif;
   font-size: 1.35rem;
   font-weight: 700;
   text-decoration: none;
@@ -123,7 +127,7 @@ main {
 
 h1 {
   margin: 0;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: Georgia, 'Times New Roman', serif;
   font-size: clamp(3rem, 7vw, 5.4rem);
   font-weight: 500;
   letter-spacing: -0.055em;
@@ -194,7 +198,7 @@ h1 em {
   border: 1px solid #efb6a8;
   border-radius: 50%;
   color: var(--accent-dark);
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: Georgia, 'Times New Roman', serif;
   font-size: 0.82rem;
 }
 
@@ -221,7 +225,7 @@ p {
 
 .workspace-heading h2 {
   margin: 0 0 3px;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: Georgia, 'Times New Roman', serif;
   font-size: 1.2rem;
 }
 
@@ -311,7 +315,7 @@ p {
 
 .drop-zone strong {
   margin-bottom: 7px;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: Georgia, 'Times New Roman', serif;
   font-size: 1.2rem;
 }
 
@@ -432,9 +436,7 @@ p {
   overflow: hidden;
   place-items: center;
   border-radius: 12px;
-  background:
-    radial-gradient(circle at 50% 45%, #34322e, #181715 65%),
-    #181715;
+  background: radial-gradient(circle at 50% 45%, #34322e, #181715 65%), #181715;
 }
 
 .preview-stage video {
@@ -494,7 +496,7 @@ p {
 .next-step span {
   display: block;
   margin-bottom: 4px;
-  color: #8c8981;
+  color: var(--muted);
   font-size: 0.67rem;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -516,7 +518,7 @@ p {
 }
 
 .next-step strong {
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: Georgia, 'Times New Roman', serif;
   font-size: 0.95rem;
 }
 
@@ -554,7 +556,7 @@ p {
 
 .trim-heading h2 {
   margin: 0 0 3px;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: Georgia, 'Times New Roman', serif;
   font-size: 1.2rem;
 }
 
@@ -578,7 +580,7 @@ p {
   margin: 25px 0 6px;
   display: flex;
   justify-content: space-between;
-  color: #858178;
+  color: var(--muted);
   font-size: 0.66rem;
   font-variant-numeric: tabular-nums;
 }
@@ -688,7 +690,7 @@ p {
   left: 50%;
   width: 7px;
   height: 7px;
-  content: "";
+  content: '';
   border-radius: 50%;
   background: white;
   box-shadow: 0 0 0 1px rgb(0 0 0 / 42%);
@@ -723,7 +725,7 @@ p {
   left: 50%;
   width: 0;
   height: 0;
-  content: "";
+  content: '';
   border: 4px solid transparent;
   border-top-color: var(--accent-dark);
   transform: translateX(-50%);
@@ -813,7 +815,7 @@ p {
 .selection-duration > span {
   display: block;
   margin-bottom: 7px;
-  color: #817e76;
+  color: var(--muted);
   font-size: 0.68rem;
   font-weight: 750;
   letter-spacing: 0.06em;
@@ -849,7 +851,7 @@ p {
 
 .time-input-wrap small {
   padding-right: 11px;
-  color: #928f87;
+  color: var(--muted);
   font-size: 0.7rem;
 }
 
@@ -863,7 +865,7 @@ p {
 }
 
 .selection-duration strong {
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: Georgia, 'Times New Roman', serif;
   font-size: 0.95rem;
   font-variant-numeric: tabular-nums;
 }
@@ -875,17 +877,17 @@ p {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border-color: var(--accent);
+  border-color: var(--accent-dark);
   border-radius: 8px;
   color: white;
-  background: var(--accent);
+  background: var(--accent-dark);
   font-size: 0.78rem;
   font-weight: 750;
 }
 
 .button--play:hover {
-  border-color: var(--accent-dark);
-  background: var(--accent-dark);
+  border-color: #a93622;
+  background: #a93622;
 }
 
 .button--play svg {
@@ -919,8 +921,7 @@ p {
   border: 1px solid #d8d4ca;
   border-radius: 11px;
   background:
-    linear-gradient(120deg, rgb(40 122 90 / 6%), transparent 55%),
-    #fbfaf6;
+    linear-gradient(120deg, rgb(40 122 90 / 6%), transparent 55%), #fbfaf6;
 }
 
 .export-mode {
@@ -1087,7 +1088,7 @@ p {
 
 .result-heading h2 {
   margin: 0;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: Georgia, 'Times New Roman', serif;
   font-size: 1.15rem;
 }
 
@@ -1110,7 +1111,7 @@ p {
 .result-summary > div > span {
   display: block;
   margin-bottom: 3px;
-  color: #858178;
+  color: var(--muted);
   font-size: 0.62rem;
   font-weight: 750;
   letter-spacing: 0.06em;
@@ -1240,7 +1241,7 @@ p {
 
 .dialog-heading h2 {
   margin: 0;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: Georgia, 'Times New Roman', serif;
   font-size: 1.25rem;
 }
 
@@ -1292,7 +1293,7 @@ p {
 }
 
 .filename-help {
-  color: #88847b;
+  color: var(--muted);
 }
 
 .filename-error {
@@ -1368,7 +1369,7 @@ footer {
   align-items: center;
   justify-content: space-between;
   border-top: 1px solid var(--line);
-  color: #8c8981;
+  color: var(--muted);
   font-size: 0.7rem;
 }
 

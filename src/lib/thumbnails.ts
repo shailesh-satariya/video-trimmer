@@ -23,10 +23,7 @@ export function getThumbnailCount(timelineWidth: number): number {
   return Math.min(16, Math.max(8, Math.ceil(timelineWidth / 100)));
 }
 
-export function getThumbnailTimes(
-  duration: number,
-  count: number,
-): number[] {
+export function getThumbnailTimes(duration: number, count: number): number[] {
   if (
     !Number.isFinite(duration) ||
     duration <= 0 ||
@@ -194,4 +191,3 @@ export async function generateThumbnails({
     video.load();
   }
 }
-

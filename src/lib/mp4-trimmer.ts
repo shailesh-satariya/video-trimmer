@@ -80,33 +80,36 @@ export function startLosslessMp4Trim(
   const result = new Promise<TrimmedVideo>((resolve, reject) => {
     rejectTask = reject;
 
-    worker.addEventListener('message', (event: MessageEvent<TrimWorkerResponse>) => {
-      const message = event.data;
+    worker.addEventListener(
+      'message',
+      (event: MessageEvent<TrimWorkerResponse>) => {
+        const message = event.data;
 
-      if (message.type === 'progress') {
-        onProgress({
-          phase: message.phase,
-          progress: message.progress,
+        if (message.type === 'progress') {
+          onProgress({
+            phase: message.phase,
+            progress: message.progress,
+          });
+          return;
+        }
+
+        settled = true;
+        worker.terminate();
+
+        if (message.type === 'error') {
+          reject(new Error(message.message));
+          return;
+        }
+
+        resolve({
+          actualEndSec: message.actualEndSec,
+          actualStartSec: message.actualStartSec,
+          blob: new Blob([message.buffer], { type: 'video/mp4' }),
+          duration: message.duration,
+          filename: getTrimmedFilename(file.name),
         });
-        return;
-      }
-
-      settled = true;
-      worker.terminate();
-
-      if (message.type === 'error') {
-        reject(new Error(message.message));
-        return;
-      }
-
-      resolve({
-        actualEndSec: message.actualEndSec,
-        actualStartSec: message.actualStartSec,
-        blob: new Blob([message.buffer], { type: 'video/mp4' }),
-        duration: message.duration,
-        filename: getTrimmedFilename(file.name),
-      });
-    });
+      },
+    );
 
     worker.addEventListener('error', (event) => {
       if (settled) {
@@ -115,7 +118,9 @@ export function startLosslessMp4Trim(
 
       settled = true;
       worker.terminate();
-      reject(new Error(event.message || 'The trimming worker stopped unexpectedly.'));
+      reject(
+        new Error(event.message || 'The trimming worker stopped unexpectedly.'),
+      );
     });
 
     const request: TrimWorkerRequest = {

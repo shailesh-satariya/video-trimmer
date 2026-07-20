@@ -19,4 +19,3 @@ export function formatTime(seconds: number): string {
 
   return `${clock}.${String(remainingMilliseconds).padStart(3, '0')}`;
 }
-

@@ -1,8 +1,5 @@
 export type TrimProgressPhase =
-  | 'reading'
-  | 'parsing'
-  | 'copying'
-  | 'finalizing';
+  'reading' | 'parsing' | 'copying' | 'finalizing';
 
 export type TrimWorkerRequest = {
   type: 'trim';
@@ -31,7 +28,4 @@ export type TrimWorkerError = {
 };
 
 export type TrimWorkerResponse =
-  | TrimWorkerProgress
-  | TrimWorkerComplete
-  | TrimWorkerError;
-
+  TrimWorkerProgress | TrimWorkerComplete | TrimWorkerError;

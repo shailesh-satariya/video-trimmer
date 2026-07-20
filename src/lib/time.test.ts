@@ -16,4 +16,3 @@ describe('formatTime', () => {
     expect(formatTime(-1)).toBe('00:00.000');
   });
 });
-

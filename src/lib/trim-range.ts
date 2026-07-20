@@ -56,4 +56,3 @@ export function getRangePercentages(
     end: (range.end / duration) * 100,
   };
 }
-

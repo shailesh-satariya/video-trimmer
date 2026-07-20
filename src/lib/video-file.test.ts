@@ -34,9 +34,7 @@ describe('validateVideoFile', () => {
   it('rejects empty and unsupported files', () => {
     expect(validateVideoFile(videoFile({ size: 0 }))).toContain('empty');
     expect(
-      validateVideoFile(
-        videoFile({ name: 'clip.webm', type: 'video/webm' }),
-      ),
+      validateVideoFile(videoFile({ name: 'clip.webm', type: 'video/webm' })),
     ).toContain('Unsupported');
   });
 
@@ -63,4 +61,3 @@ describe('video file presentation', () => {
     expect(getVideoSizeNotice(1_000_000_000)).toContain('significant memory');
   });
 });
-
