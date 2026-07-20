@@ -33,6 +33,21 @@ export function getTrimmedFilename(filename: string): string {
   return `${basename || 'video'}-trimmed.mp4`;
 }
 
+export function getFilenameStem(filename: string): string {
+  return filename.replace(/\.mp4$/i, '');
+}
+
+export function normalizeDownloadFilename(value: string): string {
+  const withoutExtension = value.trim().replace(/(?:\.mp4)+$/i, '');
+  const sanitized = withoutExtension
+    .replace(/[\\/:*?"<>|]/g, '-')
+    .replace(/\s+/g, ' ')
+    .replace(/[.\s-]+$/g, '')
+    .trim();
+
+  return `${sanitized || 'video-trimmed'}.mp4`;
+}
+
 export function getAlignmentNotice(
   requestedStartSec: number,
   actualStartSec: number,

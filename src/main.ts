@@ -18,6 +18,8 @@ import {
 } from './lib/thumbnails';
 import {
   getAlignmentNotice,
+  getFilenameStem,
+  normalizeDownloadFilename,
   startLosslessMp4Trim,
   type TrimProgress,
   type TrimTask,
@@ -348,12 +350,12 @@ app.innerHTML = `
                 <span>Size</span>
                 <strong id="result-size">—</strong>
               </div>
-              <a id="download-result" class="button button--download" href="#">
+              <button id="download-result" class="button button--download" type="button">
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M12 4v11m0 0 4-4m-4 4-4-4M5 19h14" />
                 </svg>
                 Download
-              </a>
+              </button>
             </div>
 
             <p id="alignment-notice" class="alignment-notice" hidden></p>
@@ -404,6 +406,66 @@ app.innerHTML = `
       <span>Videos are processed locally and never leave your browser.</span>
       <span>Clipwell · Private video trimming</span>
     </footer>
+
+    <dialog id="filename-dialog" class="filename-dialog" aria-labelledby="filename-dialog-title">
+      <form id="filename-form">
+        <div class="dialog-heading">
+          <div>
+            <span class="dialog-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M12 4v11m0 0 4-4m-4 4-4-4M5 19h14" />
+              </svg>
+            </span>
+            <div>
+              <span>Save locally</span>
+              <h2 id="filename-dialog-title">Name your video</h2>
+            </div>
+          </div>
+          <button
+            id="close-filename-dialog"
+            class="icon-button"
+            type="button"
+            aria-label="Close filename dialog"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6 6l12 12M18 6 6 18" />
+            </svg>
+          </button>
+        </div>
+
+        <label class="filename-field">
+          <span>File name</span>
+          <span class="filename-input-wrap">
+            <input
+              id="download-filename"
+              type="text"
+              autocomplete="off"
+              maxlength="180"
+              aria-describedby="filename-help filename-error"
+            />
+            <small>.mp4</small>
+          </span>
+        </label>
+        <p id="filename-help" class="filename-help">
+          The file will be saved to your browser’s download location.
+        </p>
+        <p id="filename-error" class="filename-error" role="alert" hidden>
+          Enter a file name.
+        </p>
+
+        <div class="dialog-actions">
+          <button id="cancel-filename" class="button button--quiet" type="button">
+            Cancel
+          </button>
+          <button class="button button--download" type="submit">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 4v11m0 0 4-4m-4 4-4-4M5 19h14" />
+            </svg>
+            Download file
+          </button>
+        </div>
+      </form>
+    </dialog>
   </div>
 `;
 
@@ -464,10 +526,20 @@ const resultPreview = queryElement<HTMLVideoElement>('#result-preview');
 const resultFilename = queryElement<HTMLElement>('#result-filename');
 const resultDuration = queryElement<HTMLElement>('#result-duration');
 const resultSize = queryElement<HTMLElement>('#result-size');
-const downloadResult = queryElement<HTMLAnchorElement>('#download-result');
+const downloadResult = queryElement<HTMLButtonElement>('#download-result');
 const alignmentNotice = queryElement<HTMLParagraphElement>('#alignment-notice');
 const discardResultButton =
   queryElement<HTMLButtonElement>('#discard-result');
+const filenameDialog =
+  queryElement<HTMLDialogElement>('#filename-dialog');
+const filenameForm = queryElement<HTMLFormElement>('#filename-form');
+const downloadFilename =
+  queryElement<HTMLInputElement>('#download-filename');
+const filenameError = queryElement<HTMLParagraphElement>('#filename-error');
+const closeFilenameDialog =
+  queryElement<HTMLButtonElement>('#close-filename-dialog');
+const cancelFilenameButton =
+  queryElement<HTMLButtonElement>('#cancel-filename');
 
 let currentUrl: string | undefined;
 let currentFile: File | undefined;
@@ -478,6 +550,7 @@ let thumbnailUrls: string[] = [];
 let playingSelection = false;
 let trimTask: TrimTask | undefined;
 let resultUrl: string | undefined;
+let resultDownloadFilename: string | undefined;
 
 function showImportError(message: string): void {
   importError.textContent = message;
@@ -496,6 +569,9 @@ function stopSelectionPlayback(): void {
 }
 
 function releaseResult(): void {
+  if (filenameDialog.open) {
+    filenameDialog.close();
+  }
   resultPreview.pause();
   resultPreview.removeAttribute('src');
   resultPreview.load();
@@ -506,8 +582,9 @@ function releaseResult(): void {
   }
 
   resultPanel.hidden = true;
-  downloadResult.removeAttribute('href');
-  downloadResult.removeAttribute('download');
+  resultDownloadFilename = undefined;
+  downloadFilename.value = '';
+  filenameError.hidden = true;
 }
 
 function setExportBusy(isBusy: boolean): void {
@@ -989,8 +1066,7 @@ trimVideoButton.addEventListener('click', async () => {
     resultFilename.textContent = result.filename;
     resultDuration.textContent = formatTime(result.duration);
     resultSize.textContent = formatBytes(result.blob.size);
-    downloadResult.href = resultUrl;
-    downloadResult.download = result.filename;
+    resultDownloadFilename = result.filename;
 
     const notice = getAlignmentNotice(
       requestedStart,
@@ -1040,6 +1116,60 @@ discardResultButton.addEventListener('click', () => {
     behavior: 'smooth',
     block: 'nearest',
   });
+});
+
+function closeDownloadDialog(): void {
+  if (filenameDialog.open) {
+    filenameDialog.close();
+  }
+}
+
+downloadResult.addEventListener('click', () => {
+  if (!resultUrl || !resultDownloadFilename) {
+    return;
+  }
+
+  downloadFilename.value = getFilenameStem(resultDownloadFilename);
+  filenameError.hidden = true;
+  filenameDialog.showModal();
+  downloadFilename.focus();
+  downloadFilename.select();
+});
+
+closeFilenameDialog.addEventListener('click', closeDownloadDialog);
+cancelFilenameButton.addEventListener('click', closeDownloadDialog);
+
+downloadFilename.addEventListener('input', () => {
+  if (downloadFilename.value.trim()) {
+    filenameError.hidden = true;
+  }
+});
+
+filenameForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+
+  if (!resultUrl) {
+    closeDownloadDialog();
+    return;
+  }
+
+  if (!downloadFilename.value.trim()) {
+    filenameError.hidden = false;
+    downloadFilename.focus();
+    return;
+  }
+
+  const filename = normalizeDownloadFilename(downloadFilename.value);
+  const download = document.createElement('a');
+  download.href = resultUrl;
+  download.download = filename;
+  download.hidden = true;
+  document.body.append(download);
+  download.click();
+  download.remove();
+  resultDownloadFilename = filename;
+  resultFilename.textContent = filename;
+  closeDownloadDialog();
 });
 
 videoInput.addEventListener('change', () => {
