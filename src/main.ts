@@ -5,6 +5,17 @@ import {
   getVideoSizeNotice,
   validateVideoFile,
 } from './lib/video-file';
+import {
+  getRangePercentages,
+  updateTrimRange,
+  type TrimHandle,
+  type TrimRange,
+} from './lib/trim-range';
+import {
+  generateThumbnails,
+  getThumbnailCount,
+  type GeneratedThumbnail,
+} from './lib/thumbnails';
 import './styles.css';
 
 const app = document.querySelector<HTMLDivElement>('#app');
@@ -148,13 +159,111 @@ app.innerHTML = `
 
         <p id="preview-message" class="import-message" role="status" hidden></p>
 
-        <div class="next-step">
-          <div>
-            <span>Up next</span>
-            <strong>Create thumbnails and choose the trim range</strong>
+        <section
+          id="trim-section"
+          class="trim-section"
+          aria-labelledby="trim-title"
+          hidden
+        >
+          <div class="trim-heading">
+            <div>
+              <span class="step-number">02</span>
+              <div>
+                <h2 id="trim-title">Choose the moment</h2>
+                <p>Drag the handles or enter exact times.</p>
+              </div>
+            </div>
+            <span id="thumbnail-status" class="thumbnail-status" role="status">
+              Preparing frames…
+            </span>
           </div>
-          <span class="next-step-marker" aria-hidden="true">02</span>
-        </div>
+
+          <div class="timeline-time-row" aria-hidden="true">
+            <span>00:00.000</span>
+            <span id="timeline-end-label">00:00.000</span>
+          </div>
+
+          <div
+            id="timeline"
+            class="timeline"
+            aria-label="Video thumbnail timeline"
+          >
+            <div id="thumbnail-strip" class="thumbnail-strip" aria-hidden="true"></div>
+            <div id="timeline-shade-before" class="timeline-shade timeline-shade--before"></div>
+            <div id="timeline-shade-after" class="timeline-shade timeline-shade--after"></div>
+            <div id="timeline-selection" class="timeline-selection"></div>
+            <div id="timeline-playhead" class="timeline-playhead" aria-hidden="true"></div>
+            <div id="start-tooltip" class="handle-tooltip handle-tooltip--start" aria-hidden="true">00:00.000</div>
+            <div id="end-tooltip" class="handle-tooltip handle-tooltip--end" aria-hidden="true">00:00.000</div>
+            <input
+              id="trim-start-range"
+              class="trim-range trim-range--start"
+              type="range"
+              min="0"
+              max="1"
+              value="0"
+              step="0.001"
+              aria-label="Trim start"
+            />
+            <input
+              id="trim-end-range"
+              class="trim-range trim-range--end"
+              type="range"
+              min="0"
+              max="1"
+              value="1"
+              step="0.001"
+              aria-label="Trim end"
+            />
+          </div>
+
+          <div class="trim-controls">
+            <label class="time-field">
+              <span>Start</span>
+              <span class="time-input-wrap">
+                <input
+                  id="trim-start-input"
+                  type="number"
+                  min="0"
+                  value="0"
+                  step="0.001"
+                  inputmode="decimal"
+                  aria-label="Trim start in seconds"
+                />
+                <small>sec</small>
+              </span>
+            </label>
+
+            <div class="selection-duration">
+              <span>Selected</span>
+              <strong id="selection-duration">00:00.000</strong>
+            </div>
+
+            <label class="time-field">
+              <span>End</span>
+              <span class="time-input-wrap">
+                <input
+                  id="trim-end-input"
+                  type="number"
+                  min="0"
+                  value="1"
+                  step="0.001"
+                  inputmode="decimal"
+                  aria-label="Trim end in seconds"
+                />
+                <small>sec</small>
+              </span>
+            </label>
+
+            <button id="play-selection" class="button button--play" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path class="play-icon" d="M8 5.5v13l10-6.5L8 5.5Z" />
+                <path class="pause-icon" d="M8.5 6v12M15.5 6v12" />
+              </svg>
+              <span>Play selection</span>
+            </button>
+          </div>
+        </section>
       </section>
 
       <section id="trust-row" class="trust-row" aria-label="Product benefits">
@@ -228,10 +337,33 @@ const size = queryElement<HTMLElement>('#video-size');
 const format = queryElement<HTMLElement>('#video-format');
 const replaceButton = queryElement<HTMLButtonElement>('#replace-video');
 const removeButton = queryElement<HTMLButtonElement>('#remove-video');
+const trimSection = queryElement<HTMLElement>('#trim-section');
+const thumbnailStatus = queryElement<HTMLElement>('#thumbnail-status');
+const thumbnailStrip = queryElement<HTMLElement>('#thumbnail-strip');
+const timeline = queryElement<HTMLElement>('#timeline');
+const timelineEndLabel = queryElement<HTMLElement>('#timeline-end-label');
+const timelineSelection = queryElement<HTMLElement>('#timeline-selection');
+const timelineShadeBefore = queryElement<HTMLElement>('#timeline-shade-before');
+const timelineShadeAfter = queryElement<HTMLElement>('#timeline-shade-after');
+const timelinePlayhead = queryElement<HTMLElement>('#timeline-playhead');
+const startTooltip = queryElement<HTMLElement>('#start-tooltip');
+const endTooltip = queryElement<HTMLElement>('#end-tooltip');
+const startRange = queryElement<HTMLInputElement>('#trim-start-range');
+const endRange = queryElement<HTMLInputElement>('#trim-end-range');
+const startInput = queryElement<HTMLInputElement>('#trim-start-input');
+const endInput = queryElement<HTMLInputElement>('#trim-end-input');
+const selectionDuration = queryElement<HTMLElement>('#selection-duration');
+const playSelectionButton =
+  queryElement<HTMLButtonElement>('#play-selection');
+const playSelectionLabel = queryElement<HTMLElement>('#play-selection span');
 
 let currentUrl: string | undefined;
 let currentFile: File | undefined;
 let dragDepth = 0;
+let trimRange: TrimRange = { start: 0, end: 0 };
+let thumbnailController: AbortController | undefined;
+let thumbnailUrls: string[] = [];
+let playingSelection = false;
 
 function showImportError(message: string): void {
   importError.textContent = message;
@@ -243,7 +375,34 @@ function clearImportError(): void {
   importError.hidden = true;
 }
 
+function stopSelectionPlayback(): void {
+  playingSelection = false;
+  playSelectionButton.classList.remove('is-playing');
+  playSelectionLabel.textContent = 'Play selection';
+}
+
+function clearThumbnails(): void {
+  thumbnailController?.abort();
+  thumbnailController = undefined;
+
+  for (const url of thumbnailUrls) {
+    URL.revokeObjectURL(url);
+  }
+
+  thumbnailUrls = [];
+  thumbnailStrip.replaceChildren();
+}
+
+function resetTrimInterface(): void {
+  stopSelectionPlayback();
+  clearThumbnails();
+  trimRange = { start: 0, end: 0 };
+  trimSection.hidden = true;
+  timelinePlayhead.style.left = '0%';
+}
+
 function releaseCurrentVideo(): void {
+  resetTrimInterface();
   video.pause();
   video.removeAttribute('src');
   video.load();
@@ -254,6 +413,143 @@ function releaseCurrentVideo(): void {
   }
 
   currentFile = undefined;
+}
+
+function renderTrimRange(): void {
+  const mediaDuration = video.duration;
+  const percentages = getRangePercentages(trimRange, mediaDuration);
+  const startPercent = `${percentages.start}%`;
+  const endPercent = `${percentages.end}%`;
+
+  startRange.value = String(trimRange.start);
+  endRange.value = String(trimRange.end);
+  startInput.value = trimRange.start.toFixed(3);
+  endInput.value = trimRange.end.toFixed(3);
+  selectionDuration.textContent = formatTime(trimRange.end - trimRange.start);
+
+  timelineSelection.style.left = startPercent;
+  timelineSelection.style.width = `${percentages.end - percentages.start}%`;
+  timelineShadeBefore.style.width = startPercent;
+  timelineShadeAfter.style.left = endPercent;
+  timelineShadeAfter.style.width = `${100 - percentages.end}%`;
+  startTooltip.style.left = startPercent;
+  endTooltip.style.left = endPercent;
+  startTooltip.textContent = formatTime(trimRange.start);
+  endTooltip.textContent = formatTime(trimRange.end);
+  startRange.setAttribute('aria-valuetext', formatTime(trimRange.start));
+  endRange.setAttribute('aria-valuetext', formatTime(trimRange.end));
+}
+
+function setTrimValue(
+  handle: TrimHandle,
+  value: number,
+  seekPreview = true,
+): void {
+  trimRange = updateTrimRange(
+    trimRange,
+    handle,
+    value,
+    video.duration,
+  );
+  renderTrimRange();
+  stopSelectionPlayback();
+
+  if (seekPreview && Number.isFinite(video.duration)) {
+    const seekTime = handle === 'start' ? trimRange.start : trimRange.end;
+    video.currentTime = seekTime;
+  }
+}
+
+function updatePlayhead(): void {
+  if (!Number.isFinite(video.duration) || video.duration <= 0) {
+    timelinePlayhead.style.left = '0%';
+    return;
+  }
+
+  const position = Math.min(
+    100,
+    Math.max(0, (video.currentTime / video.duration) * 100),
+  );
+  timelinePlayhead.style.left = `${position}%`;
+}
+
+function renderThumbnail(thumbnail: GeneratedThumbnail, index: number): void {
+  const slot = thumbnailStrip.children.item(index);
+  if (!(slot instanceof HTMLElement)) {
+    URL.revokeObjectURL(thumbnail.url);
+    return;
+  }
+
+  thumbnailUrls.push(thumbnail.url);
+  const image = document.createElement('img');
+  image.src = thumbnail.url;
+  image.alt = '';
+  image.decoding = 'async';
+  slot.replaceChildren(image);
+  slot.classList.add('thumbnail-slot--ready');
+}
+
+async function startThumbnailGeneration(): Promise<void> {
+  if (!currentUrl || !Number.isFinite(video.duration)) {
+    return;
+  }
+
+  clearThumbnails();
+  const controller = new AbortController();
+  thumbnailController = controller;
+  const count = getThumbnailCount(timeline.clientWidth);
+
+  for (let index = 0; index < count; index += 1) {
+    const slot = document.createElement('span');
+    slot.className = 'thumbnail-slot';
+    thumbnailStrip.append(slot);
+  }
+
+  thumbnailStatus.textContent = `Generating 0 of ${count} frames`;
+  thumbnailStatus.classList.remove('thumbnail-status--error');
+  let generated = 0;
+
+  try {
+    await generateThumbnails({
+      count,
+      duration: video.duration,
+      signal: controller.signal,
+      sourceUrl: currentUrl,
+      onThumbnail: (thumbnail) => {
+        renderThumbnail(thumbnail, generated);
+        generated += 1;
+        thumbnailStatus.textContent = `Generating ${generated} of ${count} frames`;
+      },
+    });
+
+    if (!controller.signal.aborted) {
+      thumbnailStatus.textContent = `${count} preview frames`;
+    }
+  } catch (error) {
+    if (!(error instanceof DOMException && error.name === 'AbortError')) {
+      thumbnailStatus.textContent = 'Preview frames unavailable';
+      thumbnailStatus.classList.add('thumbnail-status--error');
+    }
+  } finally {
+    if (thumbnailController === controller) {
+      thumbnailController = undefined;
+    }
+  }
+}
+
+function initializeTrimInterface(): void {
+  trimRange = { start: 0, end: video.duration };
+  const max = String(video.duration);
+
+  startRange.max = max;
+  endRange.max = max;
+  startInput.max = max;
+  endInput.max = max;
+  timelineEndLabel.textContent = formatTime(video.duration);
+  trimSection.hidden = false;
+  renderTrimRange();
+  updatePlayhead();
+  void startThumbnailGeneration();
 }
 
 function showImportView(): void {
@@ -323,6 +619,7 @@ video.addEventListener('loadedmetadata', () => {
   duration.textContent = formatTime(video.duration);
   resolution.textContent = `${video.videoWidth} × ${video.videoHeight}`;
   previewLoading.hidden = true;
+  initializeTrimInterface();
 
   const sizeNotice = getVideoSizeNotice(currentFile.size);
   if (sizeNotice) {
@@ -336,6 +633,143 @@ video.addEventListener('error', () => {
   showPreviewError(
     'This file could not be played in your browser. It may contain an unsupported video codec.',
   );
+});
+
+video.addEventListener('timeupdate', () => {
+  updatePlayhead();
+
+  if (playingSelection && video.currentTime >= trimRange.end - 0.01) {
+    video.pause();
+    video.currentTime = trimRange.end;
+    updatePlayhead();
+    stopSelectionPlayback();
+  }
+});
+
+video.addEventListener('ended', stopSelectionPlayback);
+
+function handleRangeInput(handle: TrimHandle, input: HTMLInputElement): void {
+  setTrimValue(handle, Number.parseFloat(input.value));
+}
+
+function handleRangeKeydown(
+  event: KeyboardEvent,
+  handle: TrimHandle,
+): void {
+  const directions: Partial<Record<string, number>> = {
+    ArrowDown: -1,
+    ArrowLeft: -1,
+    ArrowRight: 1,
+    ArrowUp: 1,
+  };
+  const direction = directions[event.key];
+
+  if (!direction) {
+    return;
+  }
+
+  event.preventDefault();
+  const step = event.altKey ? 0.01 : event.shiftKey ? 1 : 0.1;
+  const currentValue =
+    handle === 'start' ? trimRange.start : trimRange.end;
+  setTrimValue(handle, currentValue + direction * step);
+}
+
+startRange.addEventListener('input', () => {
+  handleRangeInput('start', startRange);
+});
+
+endRange.addEventListener('input', () => {
+  handleRangeInput('end', endRange);
+});
+
+startRange.addEventListener('keydown', (event) => {
+  handleRangeKeydown(event, 'start');
+});
+
+endRange.addEventListener('keydown', (event) => {
+  handleRangeKeydown(event, 'end');
+});
+
+function bindHandleTooltip(
+  input: HTMLInputElement,
+  tooltip: HTMLElement,
+): void {
+  input.addEventListener('focus', () => {
+    tooltip.classList.add('is-visible');
+  });
+  input.addEventListener('blur', () => {
+    tooltip.classList.remove('is-visible');
+  });
+}
+
+bindHandleTooltip(startRange, startTooltip);
+bindHandleTooltip(endRange, endTooltip);
+
+function handleTimeInput(
+  handle: TrimHandle,
+  input: HTMLInputElement,
+): void {
+  const value = Number.parseFloat(input.value);
+  if (Number.isFinite(value)) {
+    setTrimValue(handle, value);
+  }
+}
+
+startInput.addEventListener('input', () => {
+  handleTimeInput('start', startInput);
+});
+
+endInput.addEventListener('input', () => {
+  handleTimeInput('end', endInput);
+});
+
+startInput.addEventListener('change', renderTrimRange);
+endInput.addEventListener('change', renderTrimRange);
+
+timeline.addEventListener('click', (event) => {
+  if (
+    event.target instanceof HTMLInputElement ||
+    !Number.isFinite(video.duration)
+  ) {
+    return;
+  }
+
+  const bounds = timeline.getBoundingClientRect();
+  const position = Math.min(
+    1,
+    Math.max(0, (event.clientX - bounds.left) / bounds.width),
+  );
+  stopSelectionPlayback();
+  video.pause();
+  video.currentTime = position * video.duration;
+  updatePlayhead();
+});
+
+playSelectionButton.addEventListener('click', async () => {
+  if (playingSelection) {
+    video.pause();
+    stopSelectionPlayback();
+    return;
+  }
+
+  if (
+    video.currentTime < trimRange.start ||
+    video.currentTime >= trimRange.end - 0.01
+  ) {
+    video.currentTime = trimRange.start;
+  }
+
+  playingSelection = true;
+  playSelectionButton.classList.add('is-playing');
+  playSelectionLabel.textContent = 'Pause selection';
+
+  try {
+    await video.play();
+  } catch {
+    stopSelectionPlayback();
+    showPreviewError('Playback could not start. Try using the video controls.');
+  }
 });
 
 videoInput.addEventListener('change', () => {
