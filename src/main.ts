@@ -16,6 +16,12 @@ import {
   getThumbnailCount,
   type GeneratedThumbnail,
 } from './lib/thumbnails';
+import {
+  getAlignmentNotice,
+  startLosslessMp4Trim,
+  type TrimProgress,
+  type TrimTask,
+} from './lib/mp4-trimmer';
 import './styles.css';
 
 const app = document.querySelector<HTMLDivElement>('#app');
@@ -263,6 +269,95 @@ app.innerHTML = `
               <span>Play selection</span>
             </button>
           </div>
+
+          <div class="export-action">
+            <div>
+              <span class="export-mode">Fast lossless trim</span>
+              <p>Original quality, with the start aligned to a nearby keyframe when needed.</p>
+            </div>
+            <button id="trim-video" class="button button--export" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M7 4.5v15l12-7.5L7 4.5Z" />
+              </svg>
+              Trim video
+            </button>
+          </div>
+
+          <div id="export-progress" class="export-progress" aria-live="polite" hidden>
+            <div class="export-progress-copy">
+              <div>
+                <span class="spinner spinner--small" aria-hidden="true"></span>
+                <div>
+                  <strong id="export-status">Preparing video…</strong>
+                  <span>Your file remains on this device.</span>
+                </div>
+              </div>
+              <button id="cancel-export" class="button button--quiet" type="button">
+                Cancel
+              </button>
+            </div>
+            <div
+              class="progress-track"
+              role="progressbar"
+              aria-label="Video trimming progress"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              aria-valuenow="0"
+            >
+              <span id="progress-fill"></span>
+            </div>
+          </div>
+
+          <p id="export-message" class="import-message" role="status" hidden></p>
+
+          <section
+            id="result-panel"
+            class="result-panel"
+            aria-labelledby="result-title"
+            hidden
+          >
+            <div class="result-heading">
+              <div>
+                <span class="result-check" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <path d="m7 12.5 3.2 3.2L17.5 8" />
+                  </svg>
+                </span>
+                <div>
+                  <span>Trim complete</span>
+                  <h2 id="result-title">Your video is ready</h2>
+                </div>
+              </div>
+              <button id="discard-result" class="button button--quiet" type="button">
+                Adjust trim
+              </button>
+            </div>
+
+            <video id="result-preview" controls playsinline preload="metadata"></video>
+
+            <div class="result-summary">
+              <div class="result-file">
+                <span>Output</span>
+                <strong id="result-filename"></strong>
+              </div>
+              <div>
+                <span>Duration</span>
+                <strong id="result-duration">—</strong>
+              </div>
+              <div>
+                <span>Size</span>
+                <strong id="result-size">—</strong>
+              </div>
+              <a id="download-result" class="button button--download" href="#">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 4v11m0 0 4-4m-4 4-4-4M5 19h14" />
+                </svg>
+                Download
+              </a>
+            </div>
+
+            <p id="alignment-notice" class="alignment-notice" hidden></p>
+          </section>
         </section>
       </section>
 
@@ -356,6 +451,23 @@ const selectionDuration = queryElement<HTMLElement>('#selection-duration');
 const playSelectionButton =
   queryElement<HTMLButtonElement>('#play-selection');
 const playSelectionLabel = queryElement<HTMLElement>('#play-selection span');
+const trimVideoButton = queryElement<HTMLButtonElement>('#trim-video');
+const exportProgress = queryElement<HTMLElement>('#export-progress');
+const exportStatus = queryElement<HTMLElement>('#export-status');
+const progressTrack = queryElement<HTMLElement>('.progress-track');
+const progressFill = queryElement<HTMLElement>('#progress-fill');
+const cancelExportButton =
+  queryElement<HTMLButtonElement>('#cancel-export');
+const exportMessage = queryElement<HTMLParagraphElement>('#export-message');
+const resultPanel = queryElement<HTMLElement>('#result-panel');
+const resultPreview = queryElement<HTMLVideoElement>('#result-preview');
+const resultFilename = queryElement<HTMLElement>('#result-filename');
+const resultDuration = queryElement<HTMLElement>('#result-duration');
+const resultSize = queryElement<HTMLElement>('#result-size');
+const downloadResult = queryElement<HTMLAnchorElement>('#download-result');
+const alignmentNotice = queryElement<HTMLParagraphElement>('#alignment-notice');
+const discardResultButton =
+  queryElement<HTMLButtonElement>('#discard-result');
 
 let currentUrl: string | undefined;
 let currentFile: File | undefined;
@@ -364,6 +476,8 @@ let trimRange: TrimRange = { start: 0, end: 0 };
 let thumbnailController: AbortController | undefined;
 let thumbnailUrls: string[] = [];
 let playingSelection = false;
+let trimTask: TrimTask | undefined;
+let resultUrl: string | undefined;
 
 function showImportError(message: string): void {
   importError.textContent = message;
@@ -379,6 +493,57 @@ function stopSelectionPlayback(): void {
   playingSelection = false;
   playSelectionButton.classList.remove('is-playing');
   playSelectionLabel.textContent = 'Play selection';
+}
+
+function releaseResult(): void {
+  resultPreview.pause();
+  resultPreview.removeAttribute('src');
+  resultPreview.load();
+
+  if (resultUrl) {
+    URL.revokeObjectURL(resultUrl);
+    resultUrl = undefined;
+  }
+
+  resultPanel.hidden = true;
+  downloadResult.removeAttribute('href');
+  downloadResult.removeAttribute('download');
+}
+
+function setExportBusy(isBusy: boolean): void {
+  const controls = [
+    startRange,
+    endRange,
+    startInput,
+    endInput,
+    playSelectionButton,
+    trimVideoButton,
+    replaceButton,
+    removeButton,
+  ];
+
+  for (const control of controls) {
+    control.disabled = isBusy;
+  }
+
+  trimSection.setAttribute('aria-busy', String(isBusy));
+  exportProgress.hidden = !isBusy;
+  trimVideoButton.hidden = isBusy;
+}
+
+function cancelActiveTrim(): void {
+  trimTask?.cancel();
+  trimTask = undefined;
+}
+
+function resetExportInterface(): void {
+  cancelActiveTrim();
+  releaseResult();
+  setExportBusy(false);
+  exportMessage.hidden = true;
+  exportMessage.textContent = '';
+  progressFill.style.width = '0%';
+  progressTrack.setAttribute('aria-valuenow', '0');
 }
 
 function clearThumbnails(): void {
@@ -402,6 +567,7 @@ function resetTrimInterface(): void {
 }
 
 function releaseCurrentVideo(): void {
+  resetExportInterface();
   resetTrimInterface();
   video.pause();
   video.removeAttribute('src');
@@ -445,6 +611,8 @@ function setTrimValue(
   value: number,
   seekPreview = true,
 ): void {
+  releaseResult();
+  exportMessage.hidden = true;
   trimRange = updateTrimRange(
     trimRange,
     handle,
@@ -770,6 +938,108 @@ playSelectionButton.addEventListener('click', async () => {
     stopSelectionPlayback();
     showPreviewError('Playback could not start. Try using the video controls.');
   }
+});
+
+function updateExportProgress(progress: TrimProgress): void {
+  const labels: Record<TrimProgress['phase'], string> = {
+    copying: 'Copying selected video and audio…',
+    finalizing: 'Finalizing your MP4…',
+    parsing: 'Reading video tracks…',
+    reading: 'Loading your local file…',
+  };
+  const percentage = Math.round(progress.progress * 100);
+
+  exportStatus.textContent = labels[progress.phase];
+  progressFill.style.width = `${percentage}%`;
+  progressTrack.setAttribute('aria-valuenow', String(percentage));
+}
+
+trimVideoButton.addEventListener('click', async () => {
+  if (!currentFile || trimTask) {
+    return;
+  }
+
+  releaseResult();
+  exportMessage.hidden = true;
+  stopSelectionPlayback();
+  video.pause();
+  setExportBusy(true);
+  updateExportProgress({ phase: 'reading', progress: 0 });
+
+  const requestedStart = trimRange.start;
+  const task = startLosslessMp4Trim(
+    currentFile,
+    requestedStart,
+    trimRange.end,
+    updateExportProgress,
+  );
+  trimTask = task;
+
+  try {
+    const result = await task.result;
+    if (trimTask !== task) {
+      return;
+    }
+
+    trimTask = undefined;
+    setExportBusy(false);
+    resultUrl = URL.createObjectURL(result.blob);
+    resultPreview.src = resultUrl;
+    resultPreview.load();
+    resultFilename.textContent = result.filename;
+    resultDuration.textContent = formatTime(result.duration);
+    resultSize.textContent = formatBytes(result.blob.size);
+    downloadResult.href = resultUrl;
+    downloadResult.download = result.filename;
+
+    const notice = getAlignmentNotice(
+      requestedStart,
+      result.actualStartSec,
+    );
+    alignmentNotice.hidden = !notice;
+    alignmentNotice.textContent = notice ?? '';
+    resultPanel.hidden = false;
+    resultPanel.scrollIntoView({
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        ? 'auto'
+        : 'smooth',
+      block: 'nearest',
+    });
+  } catch (error) {
+    trimTask = undefined;
+    setExportBusy(false);
+    exportMessage.hidden = false;
+
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      exportMessage.className = 'import-message import-message--notice';
+      exportMessage.textContent = 'Trimming cancelled. Your original video is unchanged.';
+    } else {
+      exportMessage.className = 'import-message import-message--error';
+      exportMessage.textContent =
+        error instanceof Error
+          ? error.message
+          : 'The video could not be trimmed.';
+    }
+  }
+});
+
+cancelExportButton.addEventListener('click', () => {
+  cancelActiveTrim();
+});
+
+resultPreview.addEventListener('loadedmetadata', () => {
+  if (Number.isFinite(resultPreview.duration) && resultPreview.duration > 0) {
+    resultDuration.textContent = formatTime(resultPreview.duration);
+  }
+});
+
+discardResultButton.addEventListener('click', () => {
+  releaseResult();
+  exportMessage.hidden = true;
+  trimSection.scrollIntoView({
+    behavior: 'smooth',
+    block: 'nearest',
+  });
 });
 
 videoInput.addEventListener('change', () => {
