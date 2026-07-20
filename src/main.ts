@@ -35,7 +35,7 @@ if (!app) {
 app.innerHTML = `
   <div class="page-shell">
     <header class="site-header">
-      <a class="brand" href="/" aria-label="Clipwell home">
+      <a class="brand" href="${import.meta.env.BASE_URL}" aria-label="Clipwell home">
         <span class="brand-mark" aria-hidden="true">
           <svg viewBox="0 0 24 24" role="img">
             <path d="M7 4.5v15l12-7.5L7 4.5Z" />
