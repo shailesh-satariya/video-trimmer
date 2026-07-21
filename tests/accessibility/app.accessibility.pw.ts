@@ -38,6 +38,32 @@ test('landing page has no detectable accessibility violations', async ({
   await expectNoAccessibilityViolations(page);
 });
 
+test('theme control follows the system and persists an override', async ({
+  page,
+}) => {
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.goto('/');
+
+  const root = page.locator('html');
+  const systemTheme = page.getByRole('button', { name: 'Use system theme' });
+  const lightTheme = page.getByRole('button', { name: 'Use light theme' });
+
+  await expect(root).toHaveAttribute('data-theme', 'dark');
+  await expect(systemTheme).toHaveAttribute('aria-pressed', 'true');
+
+  await lightTheme.click();
+  await expect(root).toHaveAttribute('data-theme', 'light');
+  await expect(lightTheme).toHaveAttribute('aria-pressed', 'true');
+
+  await page.reload();
+  await expect(root).toHaveAttribute('data-theme', 'light');
+
+  await systemTheme.click();
+  await expect(root).toHaveAttribute('data-theme', 'dark');
+  await expect(systemTheme).toHaveAttribute('aria-pressed', 'true');
+  await expectNoAccessibilityViolations(page);
+});
+
 test('editing workflow has no detectable accessibility violations', async ({
   page,
 }) => {

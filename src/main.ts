@@ -24,7 +24,35 @@ import {
   type TrimProgress,
   type TrimTask,
 } from './lib/mp4-trimmer';
+import {
+  isThemePreference,
+  resolveTheme,
+  type ThemePreference,
+} from './lib/theme';
 import './styles.css';
+
+const THEME_STORAGE_KEY = 'clipwell-theme';
+const systemThemeQuery = window.matchMedia('(prefers-color-scheme: dark)');
+
+function readThemePreference(): ThemePreference {
+  try {
+    const storedPreference = window.localStorage.getItem(THEME_STORAGE_KEY);
+    return isThemePreference(storedPreference) ? storedPreference : 'system';
+  } catch {
+    return 'system';
+  }
+}
+
+let themePreference = readThemePreference();
+
+function applyTheme(preference: ThemePreference): void {
+  const resolvedTheme = resolveTheme(preference, systemThemeQuery.matches);
+  document.documentElement.dataset.theme = resolvedTheme;
+  document.documentElement.dataset.themePreference = preference;
+  document.documentElement.style.colorScheme = resolvedTheme;
+}
+
+applyTheme(themePreference);
 
 const app = document.querySelector<HTMLDivElement>('#app');
 
@@ -44,12 +72,55 @@ app.innerHTML = `
         <span>Clipwell</span>
       </a>
 
-      <div class="privacy-note">
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M12 3 5.5 5.8v5.3c0 4.2 2.7 8 6.5 9.4 3.8-1.4 6.5-5.2 6.5-9.4V5.8L12 3Z" />
-          <path d="m9.3 11.8 1.7 1.7 3.8-4" />
-        </svg>
-        <span>Private by design</span>
+      <div class="header-actions">
+        <div class="privacy-note">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 3 5.5 5.8v5.3c0 4.2 2.7 8 6.5 9.4 3.8-1.4 6.5-5.2 6.5-9.4V5.8L12 3Z" />
+            <path d="m9.3 11.8 1.7 1.7 3.8-4" />
+          </svg>
+          <span>Private by design</span>
+        </div>
+
+        <div class="theme-control" role="group" aria-label="Color theme">
+          <button
+            class="theme-option"
+            type="button"
+            data-theme-option="system"
+            aria-label="Use system theme"
+            aria-pressed="false"
+            title="System theme"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="3.5" y="4.5" width="17" height="12" rx="2" />
+              <path d="M9 20h6M12 16.5V20" />
+            </svg>
+          </button>
+          <button
+            class="theme-option"
+            type="button"
+            data-theme-option="light"
+            aria-label="Use light theme"
+            aria-pressed="false"
+            title="Light theme"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="3.5" />
+              <path d="M12 2.5V5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3 7 7M17 17l1.7 1.7M18.7 5.3 17 7M7 17l-1.7 1.7" />
+            </svg>
+          </button>
+          <button
+            class="theme-option"
+            type="button"
+            data-theme-option="dark"
+            aria-label="Use dark theme"
+            aria-pressed="false"
+            title="Dark theme"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M20 15.2A8.5 8.5 0 0 1 8.8 4a8.5 8.5 0 1 0 11.2 11.2Z" />
+            </svg>
+          </button>
+        </div>
       </div>
     </header>
 
@@ -478,6 +549,10 @@ function queryElement<T extends Element>(selector: string): T {
 }
 
 const hero = queryElement<HTMLElement>('.hero');
+const themeControl = queryElement<HTMLElement>('.theme-control');
+const themeOptions = Array.from(
+  themeControl.querySelectorAll<HTMLButtonElement>('[data-theme-option]'),
+);
 const importPanel = queryElement<HTMLElement>('#import-panel');
 const previewPanel = queryElement<HTMLElement>('#preview-panel');
 const trustRow = queryElement<HTMLElement>('#trust-row');
@@ -536,6 +611,53 @@ const closeFilenameDialog = queryElement<HTMLButtonElement>(
 );
 const cancelFilenameButton =
   queryElement<HTMLButtonElement>('#cancel-filename');
+
+function renderThemeControl(): void {
+  for (const option of themeOptions) {
+    option.setAttribute(
+      'aria-pressed',
+      String(option.dataset.themeOption === themePreference),
+    );
+  }
+}
+
+function setThemePreference(preference: ThemePreference): void {
+  themePreference = preference;
+
+  try {
+    if (preference === 'system') {
+      window.localStorage.removeItem(THEME_STORAGE_KEY);
+    } else {
+      window.localStorage.setItem(THEME_STORAGE_KEY, preference);
+    }
+  } catch {
+    // Theme switching still works when storage is unavailable.
+  }
+
+  applyTheme(preference);
+  renderThemeControl();
+}
+
+themeControl.addEventListener('click', (event) => {
+  if (!(event.target instanceof Element)) {
+    return;
+  }
+
+  const option = event.target.closest<HTMLButtonElement>('[data-theme-option]');
+  const preference = option?.dataset.themeOption ?? null;
+
+  if (isThemePreference(preference)) {
+    setThemePreference(preference);
+  }
+});
+
+systemThemeQuery.addEventListener('change', () => {
+  if (themePreference === 'system') {
+    applyTheme(themePreference);
+  }
+});
+
+renderThemeControl();
 
 let currentUrl: string | undefined;
 let currentFile: File | undefined;
